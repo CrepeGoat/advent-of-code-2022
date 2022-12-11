@@ -1,7 +1,8 @@
 const std = @import("std");
+const src = @import("day1part1.zig");
 
 pub fn main() anyerror!void {
-    std.log.info("All your codebase are belong to us.", .{});
+    try src.main(std.io.getStdIn(), std.io.getStdOut());
 }
 
 test "basic test" {
