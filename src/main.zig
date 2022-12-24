@@ -1,5 +1,5 @@
 const std = @import("std");
-const src = @import("./day2part2.zig");
+const src = @import("./day3part2.zig");
 
 pub fn main() anyerror!void {
     try src.main(std.io.getStdIn().reader(), std.io.getStdOut().writer());
