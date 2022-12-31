@@ -1,6 +1,6 @@
 const std = @import("std");
 
-test "iterate through file lines" {
+test "iterate through file lines - buffer" {
     const buffer_size = 20;
     var stdin = try std.fs.cwd().openFile(
         "src/common/reader_iter_test.txt",
@@ -9,8 +9,8 @@ test "iterate through file lines" {
     defer stdin.close();
 
     var iter = readerReadUntilDelimiterOrEofIterator(buffer_size, stdin.reader(), '\n');
-    try std.testing.expectEqualSlices(u8, (try iter.next()).?, &[_]u8{ 't', 'e', 's', 't', 'i', 'n', 'g', ' ', 't', 'e', 's', 't', 'i', 'n', 'g' });
-    try std.testing.expectEqualSlices(u8, (try iter.next()).?, &[_]u8{ '1', ' ', '2', ' ', '3' });
+    try std.testing.expectEqualSlices(u8, (try iter.next()).?, "testing testing");
+    try std.testing.expectEqualSlices(u8, (try iter.next()).?, "1 2 3");
     try std.testing.expectEqual(try iter.next(), null);
 }
 
@@ -32,6 +32,49 @@ pub fn ReaderReadUntilDelimiterOrEofIterator(comptime ReaderType: type, comptime
         pub fn next(self: Self) !?[]u8 {
             var self_mut = self;
             return self.reader.readUntilDelimiterOrEof(&self_mut.buffer, self.delimiter);
+        }
+    };
+}
+
+test "iterate through file lines - alloc" {
+    var stdin = try std.fs.cwd().openFile(
+        "src/common/reader_iter_test.txt",
+        .{ .mode = std.fs.File.OpenMode.read_only },
+    );
+    defer stdin.close();
+
+    const alloc = std.testing.allocator;
+
+    var iter = readerReadUntilDelimiterOrEofAllocIterator(alloc, stdin.reader(), '\n', 20);
+    var expt_results = .{ "testing testing", "1 2 3" };
+    inline for (expt_results) |expt_result| {
+        const calc_result = (try iter.next()).?;
+        defer alloc.free(calc_result);
+        try std.testing.expectEqualSlices(u8, expt_result, calc_result);
+    }
+    try std.testing.expectEqual(try iter.next(), null);
+}
+
+pub fn readerReadUntilDelimiterOrEofAllocIterator(
+    alloc: std.mem.Allocator,
+    reader: anytype,
+    delimiter: u8,
+    max_size: usize,
+) ReaderReadUntilDelimiterOrEofAllocIterator(@TypeOf(reader)) {
+    return .{ .alloc = alloc, .reader = reader, .delimiter = delimiter, .max_size = max_size };
+}
+
+pub fn ReaderReadUntilDelimiterOrEofAllocIterator(comptime ReaderType: type) type {
+    return struct {
+        const Self = @This();
+        alloc: std.mem.Allocator,
+        reader: ReaderType,
+        delimiter: u8,
+        max_size: usize,
+
+        pub fn next(self: Self) !?[]u8 {
+            var self_mut = self;
+            return self.reader.readUntilDelimiterOrEofAlloc(self_mut.alloc, self.delimiter, self.max_size);
         }
     };
 }
